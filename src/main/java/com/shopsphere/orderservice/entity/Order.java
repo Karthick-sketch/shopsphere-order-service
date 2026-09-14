@@ -23,17 +23,32 @@ public class Order {
   @GeneratedValue(strategy = GenerationType.IDENTITY)
   private Long id;
 
-  @Column(name = "total_amount", nullable = false, precision = 10, scale = 2)
-  private BigDecimal totalAmount;
-
   @Enumerated(EnumType.STRING)
   @Column(nullable = false)
   @Builder.Default
   private OrderStatus status = OrderStatus.PENDING;
 
-  @Column(name = "order_date", nullable = false)
+  @Column(name = "placed_at", nullable = false)
   @Builder.Default
-  private LocalDateTime orderDate = LocalDateTime.now();
+  private LocalDateTime placedAt = LocalDateTime.now();
+
+  @Column(nullable = false, precision = 10, scale = 2)
+  private BigDecimal subTotal;
+
+  @Column(nullable = false, precision = 10, scale = 2)
+  private BigDecimal shipping;
+
+  @Column(nullable = false, precision = 10, scale = 2)
+  private BigDecimal total;
+
+  @Column(nullable = false)
+  private String shippingName;
+
+  @Column(nullable = false)
+  private String shippingAddress;
+
+  @Column(nullable = false)
+  private String cardLast4;
 
   @OneToMany(
     mappedBy = "order",
