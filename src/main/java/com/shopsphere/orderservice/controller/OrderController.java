@@ -1,5 +1,7 @@
 package com.shopsphere.orderservice.controller;
 
+import com.shopsphere.orderservice.dto.OrderRequest;
+import com.shopsphere.orderservice.dto.OrderResponse;
 import com.shopsphere.orderservice.entity.Order;
 import com.shopsphere.orderservice.entity.OrderItem;
 import com.shopsphere.orderservice.enums.OrderStatus;
@@ -18,7 +20,7 @@ public class OrderController {
   private final OrderService orderService;
 
   @GetMapping
-  public ResponseEntity<List<Order>> getAll() {
+  public ResponseEntity<List<OrderResponse>> getAll() {
     return ResponseEntity.ok(orderService.findAll());
   }
 
@@ -45,7 +47,7 @@ public class OrderController {
   }
 
   @PostMapping
-  public ResponseEntity<Order> create(@RequestBody Order order) {
+  public ResponseEntity<OrderResponse> create(@RequestBody OrderRequest order) {
     return ResponseEntity.status(HttpStatus.CREATED).body(
       orderService.create(order)
     );

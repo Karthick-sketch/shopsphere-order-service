@@ -25,15 +25,13 @@ public class Order {
 
   @Enumerated(EnumType.STRING)
   @Column(nullable = false)
-  @Builder.Default
-  private OrderStatus status = OrderStatus.PENDING;
+  private OrderStatus status;
 
   @Column(name = "placed_at", nullable = false)
-  @Builder.Default
-  private LocalDateTime placedAt = LocalDateTime.now();
+  private LocalDateTime placedAt;
 
   @Column(nullable = false, precision = 10, scale = 2)
-  private BigDecimal subTotal;
+  private BigDecimal subtotal;
 
   @Column(nullable = false, precision = 10, scale = 2)
   private BigDecimal shipping;
