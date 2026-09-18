@@ -23,6 +23,6 @@ public class OrderRequest {
   private String shippingName;
   private String shippingAddress;
   private String cardLast4;
-  private List<OrderItemRequest> items;
+  private List<OrderItemRequest> orderItems;
   private Long userId;
 }

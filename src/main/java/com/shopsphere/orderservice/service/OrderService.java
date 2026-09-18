@@ -47,7 +47,7 @@ public class OrderService {
   public OrderResponse create(OrderRequest orderRequest) {
     Order order = toOrder(orderRequest);
     List<OrderItem> items = orderRequest
-      .getItems()
+      .getOrderItems()
       .stream()
       .map(item -> toOrderItem(item, order))
       .toList();
