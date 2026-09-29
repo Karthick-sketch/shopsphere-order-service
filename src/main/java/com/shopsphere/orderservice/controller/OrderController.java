@@ -29,9 +29,11 @@ public class OrderController {
     return ResponseEntity.ok(orderService.findById(id));
   }
 
-  @GetMapping("/user/{userId}")
-  public ResponseEntity<List<Order>> getByUserId(@PathVariable Long userId) {
-    return ResponseEntity.ok(orderService.findByUserId(userId));
+  @GetMapping("/auth-user/{authUserId}")
+  public ResponseEntity<List<Order>> getByAuthUserId(
+    @PathVariable Long authUserId
+  ) {
+    return ResponseEntity.ok(orderService.findByAuthUserId(authUserId));
   }
 
   @GetMapping("/status/{status}")

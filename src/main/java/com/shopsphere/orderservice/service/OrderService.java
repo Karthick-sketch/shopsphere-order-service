@@ -1,8 +1,7 @@
 package com.shopsphere.orderservice.service;
 
 import com.shopsphere.orderservice.dto.*;
-import com.shopsphere.orderservice.dto.product.ProductIdsRequest;
-import com.shopsphere.orderservice.dto.product.ProductSummary;
+import com.shopsphere.orderservice.dto.product.*;
 import com.shopsphere.orderservice.entity.*;
 import com.shopsphere.orderservice.enums.OrderStatus;
 import com.shopsphere.orderservice.feign.ProductInterface;
@@ -36,8 +35,8 @@ public class OrderService {
       );
   }
 
-  public List<Order> findByUserId(Long userId) {
-    return orderRepository.findByUserId(userId);
+  public List<Order> findByAuthUserId(Long authUserId) {
+    return orderRepository.findByAuthUserId(authUserId);
   }
 
   public List<Order> findByStatus(OrderStatus status) {
@@ -94,7 +93,7 @@ public class OrderService {
       .shippingName(order.getShippingName())
       .shippingAddress(order.getShippingAddress())
       .cardLast4(order.getCardLast4())
-      .userId(order.getUserId())
+      .authUserId(order.getAuthUserId())
       .build();
   }
 
@@ -122,7 +121,7 @@ public class OrderService {
       .shippingName(order.getShippingName())
       .shippingAddress(order.getShippingAddress())
       .cardLast4(order.getCardLast4())
-      .userId(order.getUserId())
+      .authUserId(order.getAuthUserId())
       .items(
         order
           .getItems()

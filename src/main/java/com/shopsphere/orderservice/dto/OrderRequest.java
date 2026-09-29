@@ -24,5 +24,5 @@ public class OrderRequest {
   private String shippingAddress;
   private String cardLast4;
   private List<OrderItemRequest> orderItems;
-  private Long userId;
+  private Long authUserId;
 }

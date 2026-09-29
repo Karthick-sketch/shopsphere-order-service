@@ -25,5 +25,5 @@ public class OrderResponse {
   private String shippingAddress;
   private String cardLast4;
   private List<OrderItemResponse> items;
-  private Long userId;
+  private Long authUserId;
 }

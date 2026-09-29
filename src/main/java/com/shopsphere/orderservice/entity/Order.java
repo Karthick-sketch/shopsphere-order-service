@@ -57,5 +57,5 @@ public class Order {
   private List<OrderItem> items = new ArrayList<>();
 
   @Column(nullable = false)
-  private Long userId;
+  private Long authUserId;
 }
