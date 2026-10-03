@@ -1,14 +1,18 @@
 package com.shopsphere.orderservice.service;
 
 import com.shopsphere.orderservice.dto.*;
+import com.shopsphere.orderservice.dto.payment.*;
 import com.shopsphere.orderservice.dto.product.*;
 import com.shopsphere.orderservice.entity.*;
-import com.shopsphere.orderservice.enums.OrderStatus;
-import com.shopsphere.orderservice.feign.ProductInterface;
+import com.shopsphere.orderservice.enums.*;
+import com.shopsphere.orderservice.feign.*;
 import com.shopsphere.orderservice.repository.*;
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
@@ -18,14 +22,7 @@ public class OrderService {
   private final OrderItemRepository orderItemRepository;
 
   private final ProductInterface productInterface;
-
-  public List<OrderResponse> findAll() {
-    return orderRepository
-      .findAll()
-      .stream()
-      .map(this::toOrderResponse)
-      .toList();
-  }
+  private final PaymentInterface paymentInterface;
 
   public Order findById(Long id) {
     return orderRepository
@@ -35,38 +32,43 @@ public class OrderService {
       );
   }
 
-  public List<Order> findByAuthUserId(Long authUserId) {
-    return orderRepository.findByAuthUserId(authUserId);
-  }
-
-  public List<Order> findByStatus(OrderStatus status) {
-    return orderRepository.findByStatus(status);
-  }
-
-  public OrderResponse create(OrderRequest orderRequest) {
-    Order order = toOrder(orderRequest);
-    List<OrderItem> items = orderRequest
-      .getOrderItems()
+  public List<OrderResponse> findByAuthUserId(Long authUserId) {
+    return orderRepository
+      .findByAuthUserId(authUserId)
       .stream()
-      .map(item -> toOrderItem(item, order))
+      .map(this::toOrderResponse)
       .toList();
-    order.setItems(items);
-    return toOrderResponse(orderRepository.save(order));
-  }
-
-  public Order updateStatus(Long id, OrderStatus status) {
-    Order existing = findById(id);
-    existing.setStatus(status);
-    return orderRepository.save(existing);
-  }
-
-  public void delete(Long id) {
-    findById(id);
-    orderRepository.deleteById(id);
   }
 
   public List<OrderItem> findItemsByOrderId(Long orderId) {
     return orderItemRepository.findByOrderId(orderId);
+  }
+
+  @Transactional
+  public OrderResponse create(Long authUserId, OrderRequest orderRequest) {
+    Order ord = toOrder(orderRequest, authUserId);
+    Order order = orderRepository.save(ord);
+
+    PaymentResponse response = processPayment(
+      order,
+      orderRequest.getPaymentDetails()
+    );
+    if (PaymentStatus.FAILED.equals(response.getStatus())) {
+      order.setStatus(OrderStatus.PAYMENT_FAILED);
+      order = orderRepository.save(order);
+      throw new RuntimeException("Payment failed");
+    }
+
+    return toOrderResponse(order);
+  }
+
+  private PaymentResponse processPayment(Order order, PaymentDetails details) {
+    PaymentRequest paymentRequest = toPaymentRequest(
+      order.getId(),
+      order.getTotal(),
+      details
+    );
+    return paymentInterface.processPayment(paymentRequest).getBody();
   }
 
   private List<ProductSummary> getProductSummaries(List<Long> productIds) {
@@ -83,18 +85,33 @@ public class OrderService {
       .toList();
   }
 
-  private Order toOrder(OrderRequest order) {
-    return Order.builder()
-      .status(order.getStatus())
-      .placedAt(order.getPlacedAt())
-      .subtotal(order.getSubtotal())
-      .shipping(order.getShipping())
-      .total(order.getTotal())
-      .shippingName(order.getShippingName())
-      .shippingAddress(order.getShippingAddress())
-      .cardLast4(order.getCardLast4())
-      .authUserId(order.getAuthUserId())
+  private Order toOrder(OrderRequest request, Long authUserId) {
+    Order order = Order.builder()
+      .subtotal(request.getSubtotal())
+      .shipping(request.getShipping())
+      .total(request.getTotal())
+      .shippingName(request.getShippingName())
+      .shippingAddress(request.getShippingAddress())
+      .cardLast4(request.getCardLast4())
+      .authUserId(authUserId)
+      .placedAt(LocalDateTime.now())
+      .status(
+        PaymentMethod.CARD.equals(
+          request.getPaymentDetails().getPaymentMethod()
+        )
+          ? OrderStatus.PAYMENT_PENDING
+          : OrderStatus.CONFIRMED
+      )
       .build();
+
+    List<OrderItem> items = request
+      .getOrderItems()
+      .stream()
+      .map(item -> toOrderItem(item, order))
+      .toList();
+    order.setItems(items);
+
+    return order;
   }
 
   private OrderItem toOrderItem(OrderItemRequest orderItem, Order order) {
@@ -148,6 +165,23 @@ public class OrderService {
           .findFirst()
           .orElse(null)
       )
+      .build();
+  }
+
+  private PaymentRequest toPaymentRequest(
+    Long orderId,
+    BigDecimal amount,
+    PaymentDetails details
+  ) {
+    return PaymentRequest.builder()
+      .orderId(orderId)
+      .amount(amount)
+      .paymentMethod(details.getPaymentMethod())
+      .cardName(details.getCardName())
+      .cardNumber(details.getCardNumber())
+      .expiryMonth(details.getExpiryMonth())
+      .expiryYear(details.getExpiryYear())
+      .cvv(details.getCvv())
       .build();
   }
 }

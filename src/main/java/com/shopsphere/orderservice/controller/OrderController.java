@@ -4,12 +4,13 @@ import com.shopsphere.orderservice.dto.OrderRequest;
 import com.shopsphere.orderservice.dto.OrderResponse;
 import com.shopsphere.orderservice.entity.Order;
 import com.shopsphere.orderservice.entity.OrderItem;
-import com.shopsphere.orderservice.enums.OrderStatus;
 import com.shopsphere.orderservice.service.OrderService;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -20,27 +21,16 @@ public class OrderController {
   private final OrderService orderService;
 
   @GetMapping
-  public ResponseEntity<List<OrderResponse>> getAll() {
-    return ResponseEntity.ok(orderService.findAll());
+  public ResponseEntity<List<OrderResponse>> getAll(
+    @AuthenticationPrincipal Jwt jwt
+  ) {
+    Long authUserId = Long.valueOf(jwt.getClaim("sub"));
+    return ResponseEntity.ok(orderService.findByAuthUserId(authUserId));
   }
 
   @GetMapping("/{id}")
   public ResponseEntity<Order> getById(@PathVariable Long id) {
     return ResponseEntity.ok(orderService.findById(id));
-  }
-
-  @GetMapping("/auth-user/{authUserId}")
-  public ResponseEntity<List<Order>> getByAuthUserId(
-    @PathVariable Long authUserId
-  ) {
-    return ResponseEntity.ok(orderService.findByAuthUserId(authUserId));
-  }
-
-  @GetMapping("/status/{status}")
-  public ResponseEntity<List<Order>> getByStatus(
-    @PathVariable OrderStatus status
-  ) {
-    return ResponseEntity.ok(orderService.findByStatus(status));
   }
 
   @GetMapping("/{id}/items")
@@ -49,23 +39,13 @@ public class OrderController {
   }
 
   @PostMapping
-  public ResponseEntity<OrderResponse> create(@RequestBody OrderRequest order) {
-    return ResponseEntity.status(HttpStatus.CREATED).body(
-      orderService.create(order)
-    );
-  }
-
-  @PatchMapping("/{id}/status")
-  public ResponseEntity<Order> updateStatus(
-    @PathVariable Long id,
-    @RequestParam OrderStatus status
+  public ResponseEntity<OrderResponse> checkout(
+    @RequestBody OrderRequest orderRequest,
+    @AuthenticationPrincipal Jwt jwt
   ) {
-    return ResponseEntity.ok(orderService.updateStatus(id, status));
-  }
-
-  @DeleteMapping("/{id}")
-  public ResponseEntity<Void> delete(@PathVariable Long id) {
-    orderService.delete(id);
-    return ResponseEntity.noContent().build();
+    Long authUserId = Long.valueOf(jwt.getClaim("sub"));
+    return ResponseEntity.status(HttpStatus.CREATED).body(
+      orderService.create(authUserId, orderRequest)
+    );
   }
 }
