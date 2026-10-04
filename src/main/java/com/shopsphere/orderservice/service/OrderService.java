@@ -46,8 +46,7 @@ public class OrderService {
 
   @Transactional
   public OrderResponse create(Long authUserId, OrderRequest orderRequest) {
-    Order ord = toOrder(orderRequest, authUserId);
-    Order order = orderRepository.save(ord);
+    Order order = orderRepository.save(toOrder(orderRequest, authUserId));
 
     PaymentResponse response = processPayment(
       order,
