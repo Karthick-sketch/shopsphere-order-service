@@ -6,6 +6,8 @@ import com.shopsphere.orderservice.dto.product.*;
 import com.shopsphere.orderservice.entity.*;
 import com.shopsphere.orderservice.enums.*;
 import com.shopsphere.orderservice.feign.*;
+import com.shopsphere.orderservice.kafka.KafkaProducerService;
+import com.shopsphere.orderservice.kafka.OrderPlacedEvent;
 import com.shopsphere.orderservice.repository.*;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -20,6 +22,8 @@ public class OrderService {
 
   private final OrderRepository orderRepository;
   private final OrderItemRepository orderItemRepository;
+
+  private final KafkaProducerService kafkaProducerService;
 
   private final ProductInterface productInterface;
   private final PaymentInterface paymentInterface;
@@ -58,6 +62,8 @@ public class OrderService {
       throw new RuntimeException("Payment failed");
     }
 
+    kafkaProducerService.sendOrderPlacedEvent(toOrderPlacedEvent(order));
+
     return toOrderResponse(order);
   }
 
@@ -68,6 +74,20 @@ public class OrderService {
       details
     );
     return paymentInterface.processPayment(paymentRequest).getBody();
+  }
+
+  private OrderPlacedEvent toOrderPlacedEvent(Order order) {
+    return new OrderPlacedEvent(
+      new OrderPlacedData(
+        order.getAuthUserId(),
+        order.getId(),
+        order.getItems().stream().map(this::toOrderItemData).toList()
+      )
+    );
+  }
+
+  private OrderItemData toOrderItemData(OrderItem item) {
+    return new OrderItemData(item.getProductId(), item.getQuantity());
   }
 
   private List<ProductSummary> getProductSummaries(List<Long> productIds) {
