@@ -1,4 +1,4 @@
-package com.shopsphere.orderservice.kafka;
+package com.shopsphere.orderservice.kafka.producer;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -19,7 +19,7 @@ public class KafkaProducerConfig {
   private String bootstrapServers;
 
   @Bean
-  public ProducerFactory<String, OrderPlacedEvent> producerFactory() {
+  public ProducerFactory<String, Object> producerFactory() {
     Map<String, Object> config = new HashMap<>();
     config.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
     config.put(
@@ -34,7 +34,7 @@ public class KafkaProducerConfig {
   }
 
   @Bean
-  public KafkaTemplate<String, OrderPlacedEvent> kafkaTemplate() {
+  public KafkaTemplate<String, Object> kafkaTemplate() {
     return new KafkaTemplate<>(producerFactory());
   }
 }

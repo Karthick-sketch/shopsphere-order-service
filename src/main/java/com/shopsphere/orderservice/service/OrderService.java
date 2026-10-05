@@ -6,8 +6,9 @@ import com.shopsphere.orderservice.dto.product.*;
 import com.shopsphere.orderservice.entity.*;
 import com.shopsphere.orderservice.enums.*;
 import com.shopsphere.orderservice.feign.*;
-import com.shopsphere.orderservice.kafka.KafkaProducerService;
-import com.shopsphere.orderservice.kafka.OrderPlacedEvent;
+import com.shopsphere.orderservice.kafka.events.OrderPlacedEvent;
+import com.shopsphere.orderservice.kafka.events.PaymentRequestEvent;
+import com.shopsphere.orderservice.kafka.producer.KafkaProducerService;
 import com.shopsphere.orderservice.repository.*;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -26,7 +27,6 @@ public class OrderService {
   private final KafkaProducerService kafkaProducerService;
 
   private final ProductInterface productInterface;
-  private final PaymentInterface paymentInterface;
 
   public Order findById(Long id) {
     return orderRepository
@@ -52,28 +52,35 @@ public class OrderService {
   public OrderResponse create(Long authUserId, OrderRequest orderRequest) {
     Order order = orderRepository.save(toOrder(orderRequest, authUserId));
 
-    PaymentResponse response = processPayment(
-      order,
-      orderRequest.getPaymentDetails()
-    );
-    if (PaymentStatus.FAILED.equals(response.getStatus())) {
-      order.setStatus(OrderStatus.PAYMENT_FAILED);
-      order = orderRepository.save(order);
-      throw new RuntimeException("Payment failed");
+    if (PaymentMethod.CARD.equals(orderRequest.getPaymentMethod())) {
+      PaymentRequestEvent event = toPaymentRequestEvent(
+        order.getId(),
+        order.getTotal(),
+        orderRequest.getPaymentMethod(),
+        orderRequest.getPaymentToken()
+      );
+      kafkaProducerService.sendPaymentRequestEvent(event);
+    } else {
+      sendOrderPlacedEvent(order);
     }
-
-    kafkaProducerService.sendOrderPlacedEvent(toOrderPlacedEvent(order));
 
     return toOrderResponse(order);
   }
 
-  private PaymentResponse processPayment(Order order, PaymentDetails details) {
-    PaymentRequest paymentRequest = toPaymentRequest(
-      order.getId(),
-      order.getTotal(),
-      details
-    );
-    return paymentInterface.processPayment(paymentRequest).getBody();
+  @Transactional
+  public void handlePaymentResponse(PaymentResponseData data) {
+    Order order = findById(data.getOrderId());
+    if (data.getStatus().equals(PaymentStatus.SUCCESS)) {
+      order.setStatus(OrderStatus.CONFIRMED);
+      sendOrderPlacedEvent(order);
+    } else {
+      order.setStatus(OrderStatus.PAYMENT_FAILED);
+    }
+    orderRepository.save(order);
+  }
+
+  private void sendOrderPlacedEvent(Order order) {
+    kafkaProducerService.sendOrderPlacedEvent(toOrderPlacedEvent(order));
   }
 
   private OrderPlacedEvent toOrderPlacedEvent(Order order) {
@@ -115,9 +122,7 @@ public class OrderService {
       .authUserId(authUserId)
       .placedAt(LocalDateTime.now())
       .status(
-        PaymentMethod.CARD.equals(
-          request.getPaymentDetails().getPaymentMethod()
-        )
+        PaymentMethod.CARD.equals(request.getPaymentMethod())
           ? OrderStatus.PAYMENT_PENDING
           : OrderStatus.CONFIRMED
       )
@@ -187,20 +192,14 @@ public class OrderService {
       .build();
   }
 
-  private PaymentRequest toPaymentRequest(
+  private PaymentRequestEvent toPaymentRequestEvent(
     Long orderId,
     BigDecimal amount,
-    PaymentDetails details
+    PaymentMethod paymentMethod,
+    String paymentToken
   ) {
-    return PaymentRequest.builder()
-      .orderId(orderId)
-      .amount(amount)
-      .paymentMethod(details.getPaymentMethod())
-      .cardName(details.getCardName())
-      .cardNumber(details.getCardNumber())
-      .expiryMonth(details.getExpiryMonth())
-      .expiryYear(details.getExpiryYear())
-      .cvv(details.getCvv())
-      .build();
+    return new PaymentRequestEvent(
+      new PaymentRequestData(orderId, amount, paymentMethod, paymentToken)
+    );
   }
 }

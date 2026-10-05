@@ -1,6 +1,6 @@
 package com.shopsphere.orderservice.dto;
 
-import com.shopsphere.orderservice.dto.payment.PaymentDetails;
+import com.shopsphere.orderservice.enums.PaymentMethod;
 import java.math.BigDecimal;
 import java.util.List;
 import lombok.Data;
@@ -15,5 +15,6 @@ public class OrderRequest {
   private String shippingAddress;
   private String cardLast4;
   private List<OrderItemRequest> orderItems;
-  private PaymentDetails paymentDetails;
+  private PaymentMethod paymentMethod;
+  private String paymentToken;
 }

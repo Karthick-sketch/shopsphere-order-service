@@ -1,6 +1,6 @@
 package com.shopsphere.orderservice.feign;
 
-import com.shopsphere.orderservice.config.FeignServiceToServiceAuthConfig;
+import com.shopsphere.orderservice.config.FeignAuthConfig;
 import com.shopsphere.orderservice.dto.product.*;
 import java.util.List;
 import org.springframework.cloud.openfeign.FeignClient;
@@ -10,7 +10,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 
 @FeignClient(
   name = "SHOPSPHERE-PRODUCT-SERVICE",
-  configuration = FeignServiceToServiceAuthConfig.class
+  configuration = FeignAuthConfig.class
 )
 public interface ProductInterface {
   @PostMapping("/api/products/summary/bash")
