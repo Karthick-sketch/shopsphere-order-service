@@ -60,8 +60,10 @@ public class OrderService {
         orderRequest.getPaymentToken()
       );
       kafkaProducerService.sendPaymentRequestEvent(event);
-    } else {
+    } else if (PaymentMethod.COD.equals(orderRequest.getPaymentMethod())) {
       sendOrderPlacedEvent(order);
+    } else {
+      throw new RuntimeException("Invalid payment method");
     }
 
     return toOrderResponse(order);
