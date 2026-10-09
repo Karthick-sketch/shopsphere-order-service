@@ -2,10 +2,12 @@ package com.shopsphere.orderservice.controller;
 
 import com.shopsphere.orderservice.dto.OrderRequest;
 import com.shopsphere.orderservice.dto.OrderResponse;
+import com.shopsphere.orderservice.dto.OrderStatusResponse;
 import com.shopsphere.orderservice.entity.Order;
 import com.shopsphere.orderservice.entity.OrderItem;
 import com.shopsphere.orderservice.service.OrderService;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -36,6 +38,15 @@ public class OrderController {
   @GetMapping("/{id}/items")
   public ResponseEntity<List<OrderItem>> getItems(@PathVariable Long id) {
     return ResponseEntity.ok(orderService.findItemsByOrderId(id));
+  }
+
+  @GetMapping("/{id}/status")
+  public CompletableFuture<ResponseEntity<OrderStatusResponse>> getStatus(
+    @PathVariable Long id
+  ) {
+    return orderService
+      .waitForPayment(id)
+      .thenApply(res -> ResponseEntity.ok(res));
   }
 
   @PostMapping

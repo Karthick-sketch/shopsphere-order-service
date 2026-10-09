@@ -5,6 +5,7 @@ import com.shopsphere.orderservice.dto.payment.*;
 import com.shopsphere.orderservice.dto.product.*;
 import com.shopsphere.orderservice.entity.*;
 import com.shopsphere.orderservice.enums.*;
+import com.shopsphere.orderservice.exceptions.OrderNotFoundException;
 import com.shopsphere.orderservice.feign.*;
 import com.shopsphere.orderservice.kafka.events.OrderPlacedEvent;
 import com.shopsphere.orderservice.kafka.events.PaymentRequestEvent;
@@ -13,6 +14,10 @@ import com.shopsphere.orderservice.repository.*;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,12 +33,15 @@ public class OrderService {
 
   private final ProductInterface productInterface;
 
+  private final Map<
+    Long,
+    CompletableFuture<OrderStatusResponse>
+  > waitingPayments = new ConcurrentHashMap<>();
+
   public Order findById(Long id) {
     return orderRepository
       .findById(id)
-      .orElseThrow(() ->
-        new RuntimeException("Order not found with id: " + id)
-      );
+      .orElseThrow(() -> new OrderNotFoundException(id));
   }
 
   public List<OrderResponse> findByAuthUserId(Long authUserId) {
@@ -46,6 +54,12 @@ public class OrderService {
 
   public List<OrderItem> findItemsByOrderId(Long orderId) {
     return orderItemRepository.findByOrderId(orderId);
+  }
+
+  public CompletableFuture<OrderStatusResponse> waitForPayment(Long id) {
+    CompletableFuture<OrderStatusResponse> future = new CompletableFuture<>();
+    waitingPayments.put(id, future);
+    return future.orTimeout(30, TimeUnit.SECONDS);
   }
 
   @Transactional
@@ -69,6 +83,7 @@ public class OrderService {
     return toOrderResponse(order);
   }
 
+  // Kafka payment-response event handler
   @Transactional
   public void handlePaymentResponse(PaymentResponseData data) {
     Order order = findById(data.getOrderId());
@@ -79,6 +94,14 @@ public class OrderService {
       order.setStatus(OrderStatus.PAYMENT_FAILED);
     }
     orderRepository.save(order);
+
+    CompletableFuture<OrderStatusResponse> future = waitingPayments.remove(
+      data.getOrderId()
+    );
+
+    if (future != null) {
+      future.complete(toOrderStatusResponse(order));
+    }
   }
 
   private void sendOrderPlacedEvent(Order order) {
@@ -192,6 +215,10 @@ public class OrderService {
           .orElse(null)
       )
       .build();
+  }
+
+  private OrderStatusResponse toOrderStatusResponse(Order order) {
+    return new OrderStatusResponse(order.getId(), order.getStatus());
   }
 
   private PaymentRequestEvent toPaymentRequestEvent(
