@@ -10,6 +10,7 @@ public final class KafkaConstants {
 
   // event types
   public static final String ORDER_PLACED_EVENT_TYPE = "ORDER_PLACED";
+  public static final String ORDER_FAILED_EVENT_TYPE = "ORDER_FAILED";
   public static final String PAYMENT_REQUEST_EVENT_TYPE = "PAYMENT_REQUEST";
   public static final String PAYMENT_RESPONSE_EVENT_TYPE = "PAYMENT_RESPONSE";
 }

@@ -9,12 +9,12 @@ import lombok.Setter;
 @Getter
 @Setter
 @NoArgsConstructor
-public class OrderPlacedEvent extends KafkaEventBase {
+public class OrderFailedEvent extends KafkaEventBase {
 
   private OrderEventData data;
 
-  public OrderPlacedEvent(OrderEventData data) {
-    super(KafkaConstants.ORDER_PLACED_EVENT_TYPE);
+  public OrderFailedEvent(OrderEventData data) {
+    super(KafkaConstants.ORDER_FAILED_EVENT_TYPE);
     this.data = data;
   }
 }

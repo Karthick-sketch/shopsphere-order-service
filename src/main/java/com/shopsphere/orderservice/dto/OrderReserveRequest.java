@@ -8,9 +8,8 @@ import lombok.NoArgsConstructor;
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
-public class OrderPlacedData {
+public class OrderReserveRequest {
 
-  private Long userId;
   private Long orderId;
   private List<OrderItemData> orderItems;
 }

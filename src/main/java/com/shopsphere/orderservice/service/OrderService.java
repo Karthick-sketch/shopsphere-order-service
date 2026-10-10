@@ -7,6 +7,7 @@ import com.shopsphere.orderservice.entity.*;
 import com.shopsphere.orderservice.enums.*;
 import com.shopsphere.orderservice.exceptions.OrderNotFoundException;
 import com.shopsphere.orderservice.feign.*;
+import com.shopsphere.orderservice.kafka.events.OrderFailedEvent;
 import com.shopsphere.orderservice.kafka.events.OrderPlacedEvent;
 import com.shopsphere.orderservice.kafka.events.PaymentRequestEvent;
 import com.shopsphere.orderservice.kafka.producer.KafkaProducerService;
@@ -32,6 +33,7 @@ public class OrderService {
   private final KafkaProducerService kafkaProducerService;
 
   private final ProductInterface productInterface;
+  private final InventoryInterface inventoryInterface;
 
   private final Map<
     Long,
@@ -66,6 +68,8 @@ public class OrderService {
   public OrderResponse create(Long authUserId, OrderRequest orderRequest) {
     Order order = orderRepository.save(toOrder(orderRequest, authUserId));
 
+    inventoryInterface.reserve(toOrderReserveRequest(order));
+
     if (PaymentMethod.CARD.equals(orderRequest.getPaymentMethod())) {
       PaymentRequestEvent event = toPaymentRequestEvent(
         order.getId(),
@@ -92,6 +96,7 @@ public class OrderService {
       sendOrderPlacedEvent(order);
     } else {
       order.setStatus(OrderStatus.PAYMENT_FAILED);
+      kafkaProducerService.sendOrderFailedEvent(toOrderFailedEvent(order));
     }
     orderRepository.save(order);
 
@@ -110,16 +115,29 @@ public class OrderService {
 
   private OrderPlacedEvent toOrderPlacedEvent(Order order) {
     return new OrderPlacedEvent(
-      new OrderPlacedData(
-        order.getAuthUserId(),
-        order.getId(),
-        order.getItems().stream().map(this::toOrderItemData).toList()
-      )
+      toOrderEventData(order.getAuthUserId(), order.getId())
+    );
+  }
+
+  private OrderReserveRequest toOrderReserveRequest(Order order) {
+    return new OrderReserveRequest(
+      order.getId(),
+      order.getItems().stream().map(this::toOrderItemData).toList()
     );
   }
 
   private OrderItemData toOrderItemData(OrderItem item) {
     return new OrderItemData(item.getProductId(), item.getQuantity());
+  }
+
+  private OrderFailedEvent toOrderFailedEvent(Order order) {
+    return new OrderFailedEvent(
+      toOrderEventData(order.getAuthUserId(), order.getId())
+    );
+  }
+
+  private OrderEventData toOrderEventData(Long authUserId, Long orderId) {
+    return new OrderEventData(authUserId, orderId);
   }
 
   private List<ProductSummary> getProductSummaries(List<Long> productIds) {
