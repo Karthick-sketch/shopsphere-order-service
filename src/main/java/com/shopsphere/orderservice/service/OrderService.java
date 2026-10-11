@@ -5,6 +5,7 @@ import com.shopsphere.orderservice.dto.payment.*;
 import com.shopsphere.orderservice.dto.product.*;
 import com.shopsphere.orderservice.entity.*;
 import com.shopsphere.orderservice.enums.*;
+import com.shopsphere.orderservice.exceptions.InsufficientStockException;
 import com.shopsphere.orderservice.exceptions.OrderNotFoundException;
 import com.shopsphere.orderservice.feign.*;
 import com.shopsphere.orderservice.kafka.events.OrderFailedEvent;
@@ -12,7 +13,6 @@ import com.shopsphere.orderservice.kafka.events.OrderPlacedEvent;
 import com.shopsphere.orderservice.kafka.events.PaymentRequestEvent;
 import com.shopsphere.orderservice.kafka.producer.KafkaProducerService;
 import com.shopsphere.orderservice.repository.*;
-import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
@@ -68,16 +68,18 @@ public class OrderService {
   public OrderResponse create(Long authUserId, OrderRequest orderRequest) {
     Order order = orderRepository.save(toOrder(orderRequest, authUserId));
 
-    inventoryInterface.reserve(toOrderReserveRequest(order));
+    try {
+      inventoryInterface.reserve(toOrderReserveRequest(order));
+    } catch (RuntimeException e) {
+      throw new InsufficientStockException(
+        "Failed to reserve inventory for order"
+      );
+    }
 
     if (PaymentMethod.CARD.equals(orderRequest.getPaymentMethod())) {
-      PaymentRequestEvent event = toPaymentRequestEvent(
-        order.getId(),
-        order.getTotal(),
-        orderRequest.getPaymentMethod(),
-        orderRequest.getPaymentToken()
+      kafkaProducerService.sendPaymentRequestEvent(
+        toPaymentRequestEvent(order.getId(), orderRequest)
       );
-      kafkaProducerService.sendPaymentRequestEvent(event);
     } else if (PaymentMethod.COD.equals(orderRequest.getPaymentMethod())) {
       sendOrderPlacedEvent(order);
     } else {
@@ -241,12 +243,15 @@ public class OrderService {
 
   private PaymentRequestEvent toPaymentRequestEvent(
     Long orderId,
-    BigDecimal amount,
-    PaymentMethod paymentMethod,
-    String paymentToken
+    OrderRequest request
   ) {
     return new PaymentRequestEvent(
-      new PaymentRequestData(orderId, amount, paymentMethod, paymentToken)
+      new PaymentRequestData(
+        orderId,
+        request.getTotal(),
+        request.getPaymentMethod(),
+        request.getPaymentToken()
+      )
     );
   }
 }
